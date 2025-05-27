@@ -46,7 +46,7 @@ jobs:
 
       # Upload the final image
       - name: Upload image artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
-          name: pi4-nixos-image
-          path: result
+            name: pi4-nixos-image
+            path: result
