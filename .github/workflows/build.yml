@@ -1,4 +1,3 @@
-# .github/workflows/build.yml
 name: build-image
 
 on:
@@ -9,34 +8,39 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
       # Checkout the repository
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
+
+      # Set up QEMU for cross-architecture builds
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
 
       # Install Nix with flakes enabled
       - name: Install Nix
-        uses: cachix/install-nix-action@v18
+        uses: cachix/install-nix-action@v25
         with:
           extra_nix_config: |
             experimental-features = nix-command flakes
+            system-features = nixos-test benchmark big-parallel kvm
 
       # Build the SD card image via nixos-generators
-      - name: Build SD image
+      - name: Build SD image (aarch64)
         run: |
-          nix build .#packages.aarch64-linux.sdimage
+          nix build .#packages.aarch64-linux.sdimage --extra-platforms aarch64-linux
           ls -lh result
-          file result
 
       # Resize /boot partition to >=512MB using parted
       - name: Resize /boot partition
         run: |
           sudo apt-get update
-          sudo apt-get install -y parted dosfstools # ensure parted and mkfs are available
+          sudo apt-get install -y parted dosfstools
           IMG=$(readlink result)
-          # Use losetup to attach the image and manipulate partitions
           LOOP=$(sudo losetup -Pf --show "$IMG")
-          # Remove existing partitions and recreate: 1MiB offset to 513MiB FAT32, rest ext4
           sudo parted -s "$LOOP" mklabel msdos
           sudo parted -s "$LOOP" mkpart primary fat32 1MiB 513MiB
           sudo parted -s "$LOOP" mkpart primary ext4 513MiB 100%
@@ -44,9 +48,9 @@ jobs:
           sudo mkfs.ext4 -L NIXOS ${LOOP}p2
           sudo losetup -d "$LOOP"
 
-      # Upload the final image
+      # Upload the final image artifact
       - name: Upload image artifact
         uses: actions/upload-artifact@v4
         with:
-            name: pi4-nixos-image
-            path: result
+          name: pi4-nixos-image
+          path: result
