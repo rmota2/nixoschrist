@@ -155,27 +155,30 @@
           # Base Raspberry Pi SD image
           "${nixpkgs}/nixos/modules/installer/sd-card/sd-image-aarch64.nix"
           
-          # Include common configuration
-          commonConfig
-          
           # SD image specific settings
           ({ config, pkgs, lib, ... }: {
-            # Increase boot partition size
-            sdImage.firmwarePartitionOffset = 32;
-            sdImage.firmwareSize = 256;  # 256MB boot partition
+            imports = [ commonConfig ];
+            
+            # Set boot partition size to 512MB
+            sdImage.firmwareSize = 512;  # 512MB boot partition
+            
+            # Compress the image
+            sdImage.compressImage = true;
+            
+            # Disable documentation to reduce size and avoid build issues
+            documentation.enable = false;
+            documentation.nixos.enable = false;
+            
+            # Minimal kernel configuration
+            boot.supportedFilesystems = lib.mkForce [ "ext4" "vfat" ];
             
             # Ensure SSH starts on first boot
             systemd.services.sshd.wantedBy = lib.mkForce [ "multi-user.target" ];
             
-            # Compress the image
-            sdImage.compressImage = true;
+            # Fix module path issues
+            system.extraDependencies = lib.mkForce [ ];
           })
         ];
-      };
-      
-      # Build target for GitHub Actions
-      packages.${system} = {
-        sdImage = self.nixosConfigurations.installer.config.system.build.sdImage;
       };
     };
 }

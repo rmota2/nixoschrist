@@ -45,18 +45,25 @@ jobs:
     # Build the SD card image
     - name: Build SD Card Image
       run: |
-        # Note: sdImage with capital I
-        nix build .#packages.aarch64-linux.sdImage \
+        # Build with proper system handling
+        nix build .#nixosConfigurations.installer.config.system.build.sdImage \
           --extra-platforms aarch64-linux \
           --option system-features "nixos-test benchmark big-parallel kvm" \
+          --option sandbox false \
           -L
         
         # The result is a symlink, follow it to get the actual image
         echo "Build complete. Contents:"
-        ls -la result/sd-image/
+        ls -la result/
         
-        # Find the actual image file
-        IMAGE_PATH=$(find result -name "*.img*" -type f | head -n1)
+        # Handle both compressed and uncompressed images
+        if [ -d result/sd-image ]; then
+          ls -la result/sd-image/
+          IMAGE_PATH=$(find result/sd-image -name "*.img*" -type f | head -n1)
+        else
+          IMAGE_PATH=$(find result -name "*.img*" -type f | head -n1)
+        fi
+        
         echo "Found image at: $IMAGE_PATH"
         echo "IMAGE_PATH=$IMAGE_PATH" >> $GITHUB_ENV
     
