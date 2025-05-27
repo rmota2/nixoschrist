@@ -1,0 +1,52 @@
+# .github/workflows/build.yml
+name: build-image
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      # Checkout the repository
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      # Install Nix with flakes enabled
+      - name: Install Nix
+        uses: cachix/install-nix-action@v18
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+
+      # Build the SD card image via nixos-generators
+      - name: Build SD image
+        run: |
+          nix build .#packages.aarch64-linux.sdimage
+          ls -lh result
+          file result
+
+      # Resize /boot partition to >=512MB using parted
+      - name: Resize /boot partition
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y parted dosfstools # ensure parted and mkfs are available
+          IMG=$(readlink result)
+          # Use losetup to attach the image and manipulate partitions
+          LOOP=$(sudo losetup -Pf --show "$IMG")
+          # Remove existing partitions and recreate: 1MiB offset to 513MiB FAT32, rest ext4
+          sudo parted -s "$LOOP" mklabel msdos
+          sudo parted -s "$LOOP" mkpart primary fat32 1MiB 513MiB
+          sudo parted -s "$LOOP" mkpart primary ext4 513MiB 100%
+          sudo mkfs.vfat -F32 -n BOOT ${LOOP}p1
+          sudo mkfs.ext4 -L NIXOS ${LOOP}p2
+          sudo losetup -d "$LOOP"
+
+      # Upload the final image
+      - name: Upload image artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: pi4-nixos-image
+          path: result
