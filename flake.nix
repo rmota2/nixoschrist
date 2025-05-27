@@ -26,7 +26,7 @@
             # Use generic extlinux bootloader (PiROM -> bootcode.bin -> U-Boot -> NixOS)
             boot.loader.grub.enable = false;
             boot.loader.generic-extlinux-compatible.enable = true;
-
+            boot.initrd.includeDefaultModules = false;
             # Networking: enable NetworkManager, firewall, and NAT
             networking.networkmanager.enable = true;
             networking.firewall.enable = true;
